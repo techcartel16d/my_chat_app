@@ -38,7 +38,7 @@ const LoginScreen = () => {
             if (res.status == 200) {
 
                 setString('token', res.data.token)
-                setObject("user",  res.data.user)
+                setObject("user", res.data.user)
                 replace('NoAuthStack')
             }
 
@@ -49,9 +49,9 @@ const LoginScreen = () => {
             setLoading(false)
         }
 
-        console.log('Email:', email);
-        console.log('Password:', password);
-        Alert.alert('Success', 'Login clicked');
+        // console.log('Email:', email);
+        // console.log('Password:', password);
+        // Alert.alert('Success', 'Login clicked');
     };
 
     return (
@@ -74,6 +74,7 @@ const LoginScreen = () => {
                         keyboardType="email-address"
                         autoCapitalize="none"
                         autoCorrect={false}
+                        placeholderTextColor={'#000'}
                     />
 
                     <View style={styles.passwordContainer}>
@@ -83,6 +84,7 @@ const LoginScreen = () => {
                             value={password}
                             onChangeText={setPassword}
                             secureTextEntry={!showPassword} // toggle visibility
+                            placeholderTextColor={'#000'}
                         />
                         <TouchableOpacity
                             style={styles.showHideButton}
@@ -132,6 +134,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginBottom: 15,
         fontSize: 16,
+        color: '#000'
     },
     passwordContainer: {
         position: 'relative',
@@ -143,6 +146,8 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 8,
         fontSize: 16,
+        color: '#000'
+
     },
     showHideButton: {
         position: 'absolute',

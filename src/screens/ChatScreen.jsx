@@ -31,6 +31,7 @@ const ChatScreen = ({ route }) => {
         }));
     };
 
+
     // Fetch previous messages
     const getMessageHandle = async () => {
         if (currentId) {
@@ -43,6 +44,8 @@ const ChatScreen = ({ route }) => {
             }
         }
     };
+
+
 
     // Subscribe to Pusher events
     useEffect(() => {
@@ -105,6 +108,8 @@ const ChatScreen = ({ route }) => {
         };
     }, [currentId, currentUserId]);
 
+
+
     // Send message
     const onSend = useCallback(async (newMessages = []) => {
         const msg = newMessages[0];
@@ -145,6 +150,7 @@ const ChatScreen = ({ route }) => {
         }
     }, [currentId]);
 
+    
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
