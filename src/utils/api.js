@@ -6,7 +6,7 @@ console.log("soketId in api", soketId);
 
 // ✅ Axios instance
 const api = axios.create({
-    baseURL: 'https://chat.threeonline.in/chatify/api/', // apna API base url daalo
+    baseURL: 'https://chat.threeonline.in/chatify/api/',
     timeout: 10000,
     headers: {
         Accept: 'application/json',
@@ -24,9 +24,9 @@ api.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`;
         }
 
-        // 👇 Agar FormData bhej rahe ho to Content-Type auto set karne do
+        // 👇 Agar FormData bhej rahe ho to multipart laga do
         if (config.data instanceof FormData) {
-            delete config.headers['Content-Type'];  
+            config.headers['Content-Type'] = 'multipart/form-data';
         } else {
             config.headers['Content-Type'] = 'application/json';
         }

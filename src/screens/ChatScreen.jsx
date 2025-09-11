@@ -60,21 +60,21 @@ const ChatScreen = ({ route }) => {
   };
 
 
-  
+
 
   // Fetch previous messages
-const getMessageHandle = async () => {
-  if (currentId) {
-    try {
-      const res = await api.post('fetchMessages', { id: currentId });
-      console.log("get message", res.data.messages);
-      const formattedMessages = mapApiMessagesToGiftedChat(res.data.messages);
-      setMessages(formattedMessages.reverse());
-    } catch (error) {
-      console.log('❌ ERROR IN GET MESSAGE', error);
+  const getMessageHandle = async () => {
+    if (currentId) {
+      try {
+        const res = await api.post('fetchMessages', { id: currentId });
+        console.log("get message", res.data.messages);
+        const formattedMessages = mapApiMessagesToGiftedChat(res.data.messages);
+        setMessages(formattedMessages.reverse());
+      } catch (error) {
+        console.log('❌ ERROR IN GET MESSAGE', error);
+      }
     }
-  }
-};
+  };
 
   // Subscribe to Pusher events
   useEffect(() => {
@@ -160,29 +160,33 @@ const getMessageHandle = async () => {
     try {
       let res;
       if (fileUri) {
-        // 📂 Agar file hai → FormData
         const formData = new FormData();
+
         formData.append('id', currentId.toString());
         formData.append('type', 'user');
         formData.append('temporaryMsgId', tempId);
 
-        if (text) formData.append('message', text);
+        if (text) {
+          formData.append('message', text);
+        }
+
+        let fileType = 'application/octet-stream';
+        if (type === 'image') fileType = 'image/*';
+        if (type === 'video') fileType = 'video/*';
+
+        const finalName = fileName || `${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`;
 
         formData.append('file', {
-          uri: fileUri,
-          type:
-            type === 'image'
-              ? 'image/jpeg'
-              : type === 'video'
-              ? 'video/mp4'
-              : 'application/octet-stream',
-          name: fileName || `${Date.now()}.jpg`,
+          uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
+          type: fileType,
+          name: finalName,
         });
 
-        res = await api.post('/sendMessage', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-      } else {
+        // 🚀 Header yahan mat do, interceptor handle karega
+        res = await api.post('/sendMessage', formData);
+      }
+
+      else {
         // ✉️ Agar sirf text hai
         res = await api.post('/sendMessage', {
           file: null,
