@@ -4,7 +4,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GiftedChat, Bubble, InputToolbar } from 'react-native-gifted-chat';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { screenWidth } from '../utils/Constant';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import api from '../utils/api';
 import { getString } from '../utils/mmkvStorage';
 import uuid from 'react-native-uuid';
@@ -35,6 +35,8 @@ const ChatScreen = ({ route }) => {
       };
 
       // 👉 Attachment parse
+
+
       if (msg.attachment) {
         try {
           const file = JSON.parse(msg.attachment);
@@ -77,65 +79,67 @@ const ChatScreen = ({ route }) => {
   };
 
   // Subscribe to Pusher events
-  useEffect(() => {
-    const channelName = `private-chatify.${currentUserId}`;
+  useFocusEffect(
+    useCallback(() => {
+      const channelName = `private-chatify.${currentUserId}`;
 
-    subscribeChannel({
-      channelName,
-      eventName: 'messaging',
-      onEvent: data => {
-        console.log('📥 Messaging event:', data);
+      subscribeChannel({
+        channelName,
+        eventName: 'messaging',
+        onEvent: data => {
+          console.log('📥 Messaging event:', data);
 
-        if (!data || !data.message) return;
+          if (!data || !data.message) return;
 
-        const msgObj = data.message;
-        const senderId = parseInt(data.from_id);
-        const receiverId = parseInt(data.to_id);
+          const msgObj = data.message;
+          const senderId = parseInt(data.from_id);
+          const receiverId = parseInt(data.to_id);
 
-        // Sirf iss chat ke liye message append karo
-        if (
-          (senderId === currentId && receiverId === currentUserId) ||
-          (senderId === currentUserId && receiverId === currentId)
-        ) {
-          let newMsg = {
-            _id: msgObj.id,
-            createdAt: new Date(msgObj.created_at),
-            user: {
-              _id: senderId.toString(),
-              name: senderId === currentUserId ? 'You' : 'User ' + senderId,
-              avatar: 'https://i.pravatar.cc/150?img=' + senderId,
-            },
-          };
+          if (
+            (senderId === currentId && receiverId === currentUserId) ||
+            (senderId === currentUserId && receiverId === currentId)
+          ) {
+            let newMsg = {
+              _id: msgObj.id,
+              createdAt: new Date(msgObj.created_at),
+              user: {
+                _id: senderId.toString(),
+                name: senderId === currentUserId ? 'You' : 'User ' + senderId,
+                avatar: 'https://i.pravatar.cc/150?img=' + senderId,
+              },
+            };
 
-          // 👉 Check text
-          if (msgObj.message && msgObj.message.trim() !== '') {
-            newMsg.text = msgObj.message;
-          }
-
-          // 👉 Check attachment
-          if (msgObj.attachment && msgObj.attachment.file) {
-            if (msgObj.attachment.type === 'image') {
-              newMsg.image = `https://your-server.com/uploads/${msgObj.attachment.file}`;
-            } else {
-              // Agar file ho to custom handling (GiftedChat file support nahi deta by default)
-              newMsg.text = msgObj.attachment.title || '📎 File attached';
+            if (msgObj.message && msgObj.message.trim() !== '') {
+              newMsg.text = msgObj.message;
             }
+
+            if (msgObj.attachment && msgObj.attachment.file) {
+              if (msgObj.attachment.type === 'image') {
+                newMsg = {
+                  ...newMsg,
+                  text: '', // 👈 empty text dena zaruri hai
+                  image: `https://chat.threeonline.in/storage/attachments/${msgObj.attachment.file}`,
+                };
+              } else {
+                newMsg.text = msgObj.attachment.title || '📎 File attached';
+              }
+            }
+
+            setMessages(prev => GiftedChat.append(prev, [newMsg]));
+          } else {
+            console.log('📥 Background message (dusre chat ka):', data);
           }
+        },
+      });
 
-          // ✅ Append to GiftedChat
-          setMessages(prev => GiftedChat.append(prev, [newMsg]));
-        } else {
-          console.log('📥 Background message (dusre chat ka):', data);
-        }
-      },
-    });
+      getMessageHandle();
 
-    getMessageHandle();
-
-    return () => {
-      unsubscribeChannel(channelName);
-    };
-  }, [currentId, currentUserId]);
+      // 👇 Cleanup jab screen blur hogi
+      return () => {
+        unsubscribeChannel(`private-chatify.${currentUserId}`);
+      };
+    }, [currentId, currentUserId])
+  );
 
   // 📤 Common send function (text + file dono ke liye)
   const sendMessageToApi = async ({ text, fileUri, fileName, type }) => {
