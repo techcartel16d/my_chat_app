@@ -7,7 +7,9 @@ console.log("soketId in api", soketId);
 // ✅ Axios instance
 const api = axios.create({
     baseURL: 'https://chat.threeonline.in/chatify/api/',
-    timeout: 10000,
+    timeout: 60000, // ⏳ large uploads ke liye time badha do
+    maxContentLength: Infinity, // ✅ file size restriction hatao
+    maxBodyLength: Infinity,    // ✅ large file ke liye body limit hatao
     headers: {
         Accept: 'application/json',
         'X-Socket-Id': soketId || '',

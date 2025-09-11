@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GiftedChat, Bubble, InputToolbar } from 'react-native-gifted-chat';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { screenWidth } from '../utils/Constant';
@@ -13,9 +13,19 @@ import { authValue } from '../utils/AuthValueGet';
 import { pick, keepLocalCopy, types } from '@react-native-documents/picker';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import ImageView from "react-native-image-viewing";
+import RNFetchBlob from "react-native-blob-util";
 const ChatScreen = ({ route }) => {
   const { currentId } = route.params; // receiverId
   const { goBack } = useNavigation();
+  const [visible, setIsVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
 
   const currentUserId = authValue.userId; // logged-in user
   const [messages, setMessages] = useState([]);
@@ -65,18 +75,68 @@ const ChatScreen = ({ route }) => {
 
 
   // Fetch previous messages
-  const getMessageHandle = async () => {
-    if (currentId) {
-      try {
-        const res = await api.post('fetchMessages', { id: currentId });
-        console.log("get message", res.data.messages);
-        const formattedMessages = mapApiMessagesToGiftedChat(res.data.messages);
-        setMessages(formattedMessages.reverse());
-      } catch (error) {
-        console.log('❌ ERROR IN GET MESSAGE', error);
+  // const getMessageHandle = async () => {
+  //   if (currentId) {
+  //     try {
+  //       const res = await api.post('fetchMessages', { id: currentId });
+  //       console.log("get message", res.data.messages);
+  //       const formattedMessages = mapApiMessagesToGiftedChat(res.data.messages);
+  //       setMessages(formattedMessages);
+  //     } catch (error) {
+  //       console.log('❌ ERROR IN fetch MESSAGE', error);
+  //     }
+  //   }
+  // };
+
+
+  // API Call
+  const getMessageHandle = async (pageNumber = 1, isRefresh = false) => {
+    if (!currentId || loading) return;
+
+    try {
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+
+      const res = await api.post("fetchMessages", {
+        id: currentId,
+        page: pageNumber,
+        limit: 30,
+      });
+
+      const fetchedMessages = res.data.messages;
+      const formattedMessages = mapApiMessagesToGiftedChat(fetchedMessages);
+
+      if (pageNumber === 1) {
+        setMessages(formattedMessages);
+      } else {
+        setMessages(prev =>
+          GiftedChat.prepend(prev, formattedMessages)
+        );
       }
+
+      if (fetchedMessages.length < 30) {
+        setHasMore(false);
+      }
+
+      setPage(pageNumber);
+    } catch (error) {
+      console.log("❌ ERROR IN GET MESSAGE", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  // Pull to Refresh handler
+  const onRefresh = () => {
+    if (hasMore) {
+      getMessageHandle(page + 1, true); // 👈 next page load
+    }
+  };
+
+
+
+
 
   // Subscribe to Pusher events
   useFocusEffect(
@@ -141,80 +201,172 @@ const ChatScreen = ({ route }) => {
     }, [currentId, currentUserId])
   );
 
-  // 📤 Common send function (text + file dono ke liye)
+  // // 📤 Common send function (text + file dono ke liye)
+  // const sendMessageToApi = async ({ text, fileUri, fileName, type }) => {
+  //   const tempId = uuid.v4();
+
+  //   // 👀 Local preview
+  //   let previewMsg = {
+  //     _id: tempId,
+  //     createdAt: new Date(),
+  //     user: { _id: currentUserId.toString(), name: 'You' },
+  //     pending: true,
+  //   };
+
+  //   if (text) previewMsg.text = text;
+  //   if (type === 'image') previewMsg.image = fileUri;
+  //   if (type === 'video') previewMsg.video = fileUri;
+  //   if (type === 'document')
+  //     previewMsg.text = `📎 ${fileName || 'File attached'}`;
+
+  //   setMessages(prev => GiftedChat.append(prev, [previewMsg]));
+
+  //   try {
+  //     let res;
+  //     if (fileUri) {
+  //       const formData = new FormData();
+
+  //       formData.append('id', currentId.toString());
+  //       formData.append('type', 'user');
+  //       formData.append('temporaryMsgId', tempId);
+
+  //       if (text) {
+  //         formData.append('message', text);
+  //       }
+
+  //       let fileType = 'application/octet-stream';
+  //       if (type === 'image') fileType = 'image/*';
+  //       if (type === 'video') fileType = 'video/*';
+
+  //       const finalName = fileName || `${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`;
+
+  //       formData.append('file', {
+  //         uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
+  //         type: fileType,
+  //         name: finalName,
+  //       });
+
+  //       // 🚀 Header yahan mat do, interceptor handle karega
+  //       res = await api.post('/sendMessage', formData);
+  //     }
+
+  //     else {
+  //       // ✉️ Agar sirf text hai
+  //       res = await api.post('/sendMessage', {
+  //         file: null,
+  //         id: currentId.toString(),
+  //         type: 'user',
+  //         temporaryMsgId: tempId,
+  //         message: text || '',
+  //       });
+  //     }
+
+  //     console.log('✅ Sent to API:', res.data);
+
+  //     // Update local message with server ID
+  //     setMessages(prev =>
+  //       prev.map(m =>
+  //         m._id === tempId
+  //           ? { ...m, _id: res.data.id?.toString() || tempId, pending: false }
+  //           : m,
+  //       ),
+  //     );
+  //   } catch (err) {
+  //     console.log('❌ Send error', err);
+  //   }
+  // };
+
+
   const sendMessageToApi = async ({ text, fileUri, fileName, type }) => {
     const tempId = uuid.v4();
 
-    // 👀 Local preview
+    // 👀 Local preview message
     let previewMsg = {
       _id: tempId,
       createdAt: new Date(),
-      user: { _id: currentUserId.toString(), name: 'You' },
+      user: { _id: currentUserId.toString(), name: "You" },
       pending: true,
     };
 
     if (text) previewMsg.text = text;
-    if (type === 'image') previewMsg.image = fileUri;
-    if (type === 'video') previewMsg.video = fileUri;
-    if (type === 'document')
-      previewMsg.text = `📎 ${fileName || 'File attached'}`;
+    if (type === "image") previewMsg.image = fileUri;
+    if (type === "video") previewMsg.video = fileUri;
+    if (type === "document")
+      previewMsg.text = `📎 ${fileName || "File attached"}`;
 
-    setMessages(prev => GiftedChat.append(prev, [previewMsg]));
+    setMessages((prev) => GiftedChat.append(prev, [previewMsg]));
 
     try {
       let res;
+
+      // ✅ Agar file hai
       if (fileUri) {
-        const formData = new FormData();
+        let fileType = "application/octet-stream";
+        if (type === "image") fileType = "image/jpeg";
+        if (type === "video") fileType = "video/mp4";
 
-        formData.append('id', currentId.toString());
-        formData.append('type', 'user');
-        formData.append('temporaryMsgId', tempId);
+        const finalName =
+          fileName || `${Date.now()}.${type === "image" ? "jpg" : "mp4"}`;
 
-        if (text) {
-          formData.append('message', text);
-        }
+        res = await RNFetchBlob.fetch(
+          "POST",
+          "https://chat.threeonline.in/chatify/api/sendMessage",
+          {
+            Authorization: `Bearer ${getString("token")}`, // 👈 tumhara token storage se
+            "Content-Type": "multipart/form-data",
+            "X-Socket-Id": getString("socketId") || "",
+          },
+          [
+            { name: "id", data: currentId.toString() },
+            { name: "type", data: "user" },
+            { name: "temporaryMsgId", data: tempId },
+            text ? { name: "message", data: text } : null,
+            {
+              name: "file",
+              filename: finalName,
+              type: fileType,
+              data: RNFetchBlob.wrap(
+                Platform.OS === "ios"
+                  ? fileUri.replace("file://", "")
+                  : fileUri
+              ),
+            },
+          ].filter(Boolean) // null hata do
+        );
 
-        let fileType = 'application/octet-stream';
-        if (type === 'image') fileType = 'image/*';
-        if (type === 'video') fileType = 'video/*';
-
-        const finalName = fileName || `${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`;
-
-        formData.append('file', {
-          uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
-          type: fileType,
-          name: finalName,
-        });
-
-        // 🚀 Header yahan mat do, interceptor handle karega
-        res = await api.post('/sendMessage', formData);
-      }
-
-      else {
+        console.log("✅ Upload Response", res.json());
+      } else {
         // ✉️ Agar sirf text hai
-        res = await api.post('/sendMessage', {
+        res = await api.post("/sendMessage", {
           file: null,
           id: currentId.toString(),
-          type: 'user',
+          type: "user",
           temporaryMsgId: tempId,
-          message: text || '',
+          message: text || "",
         });
+        console.log("✅ Text Sent:", res.data);
       }
 
-      console.log('✅ Sent to API:', res.data);
+      const serverRes = res.json ? res.json() : res.data;
 
-      // Update local message with server ID
-      setMessages(prev =>
-        prev.map(m =>
+      // 🟢 Update local message with server ID
+      setMessages((prev) =>
+        prev.map((m) =>
           m._id === tempId
-            ? { ...m, _id: res.data.id?.toString() || tempId, pending: false }
-            : m,
-        ),
+            ? { ...m, _id: serverRes.id?.toString() || tempId, pending: false }
+            : m
+        )
       );
     } catch (err) {
-      console.log('❌ Send error', err);
+      console.log("❌ Send error", err);
     }
   };
+
+
+
+
+
+
 
   // ✉️ Text message send (GiftedChat default)
   const onSend = useCallback(
@@ -257,95 +409,6 @@ const ChatScreen = ({ route }) => {
     }
   };
 
-  //   // Send message
-  //   const onSend = useCallback(
-  //     async (newMessages = []) => {
-  //       const msg = newMessages[0];
-  //       const tempId = uuid.v4();
-
-  //       // show immediately
-  //       setMessages(prev =>
-  //         GiftedChat.append(prev, [
-  //           {
-  //             ...msg,
-  //             _id: tempId,
-  //             pending: true,
-  //             user: { ...msg.user, _id: currentUserId.toString() },
-  //           },
-  //         ]),
-  //       );
-
-  //       const payload = {
-  //         file: null,
-  //         id: currentId.toString(),
-  //         type: 'user',
-  //         temporaryMsgId: tempId,
-  //         message: msg.text || '',
-  //       };
-
-  //       try {
-  //         const res = await api.post('/sendMessage', payload);
-  //         console.log('📤 user send message', res.data);
-
-  //         // Update with server ID
-  //         setMessages(prev =>
-  //           prev.map(m =>
-  //             m._id === tempId
-  //               ? { ...m, _id: res.data.id?.toString() || tempId, pending: false }
-  //               : m,
-  //           ),
-  //         );
-  //       } catch (error) {
-  //         console.error('❌ Send error:', error);
-  //       }
-  //     },
-  //     [currentId],
-  //   );
-
-  //   const pickDocument = async () => {
-  //     try {
-  //       const [res] = await pick({ type: [types.allFiles] });
-  //       const [local] = await keepLocalCopy({
-  //         files: [{ uri: res.uri, fileName: res.name ?? 'file' }],
-  //         destination: 'documentDirectory',
-  //       });
-  //       setMessages(prev =>
-  //         GiftedChat.append(prev, [
-  //           {
-  //             _id: Math.random(),
-  //             text: `📄 File: ${res.name}`,
-  //             createdAt: new Date(),
-  //             user: { _id: 1, name: 'You' },
-  //             file: local.uri || res.uri,
-  //           },
-  //         ]),
-  //       );
-  //     } catch (err) {
-  //       console.log('Picker canceled or error:', err);
-  //     }
-  //   };
-
-  //   const pickMedia = async () => {
-  //     const result = await launchImageLibrary({ mediaType: 'mixed' });
-  //     if (result.assets && result.assets.length) {
-  //       const file = result.assets[0];
-  //       setMessages(prev =>
-  //         GiftedChat.append(prev, [
-  //           {
-  //             _id: Math.random(),
-  //             text: file.type.startsWith('video')
-  //               ? `🎥 Video: ${file.fileName || 'Selected'}`
-  //               : undefined,
-  //             image: file.type.startsWith('image') ? file.uri : undefined,
-  //             video: file.type.startsWith('video') ? file.uri : undefined,
-  //             createdAt: new Date(),
-  //             user: { _id: 1, name: 'You' },
-  //           },
-  //         ]),
-  //       );
-  //     }
-  //   };
-
   const renderCustomActions = () => (
     <View style={styles.actionContainer}>
       <TouchableOpacity onPress={pickDocument} style={styles.actionBtn}>
@@ -356,6 +419,37 @@ const ChatScreen = ({ route }) => {
       </TouchableOpacity>
     </View>
   );
+
+  const imageMessages = messages
+    .filter((m) => m.image)
+    .map((m) => ({ uri: m.image }));
+
+
+  // ✅ Custom Image renderer
+  const renderMessageImage = (props) => {
+    console.log("props", props)
+    const currentIndex = imageMessages.findIndex(
+      (img) => img.uri === props.currentMessage.image
+    );
+
+    return (
+      <TouchableOpacity
+        onPress={() => {
+          setSelectedIndex(currentIndex);
+          setIsVisible(true);
+        }}
+      >
+        <Image
+          source={{ uri: props.currentMessage.image }}
+          style={{ width: 200, height: 200, borderRadius: 10 }}
+          resizeMode="cover"
+        />
+      </TouchableOpacity>
+    );
+  };
+
+
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -378,19 +472,58 @@ const ChatScreen = ({ route }) => {
         alwaysShowSend
         scrollToBottom
         renderActions={renderCustomActions}
-        renderBubble={props => (
-          <Bubble
-            {...props}
-            wrapperStyle={{
-              right: { backgroundColor: '#1E90FF' },
-              left: { backgroundColor: '#f0f0f0' },
-            }}
-            textStyle={{
-              right: { color: '#fff' },
-              left: { color: '#000' },
-            }}
-          />
-        )}
+        // renderBubble={props => (
+        //   <Bubble
+        //     {...props}
+        //     wrapperStyle={{
+        //       right: { backgroundColor: '#1E90FF' },
+        //       left: { backgroundColor: '#f0f0f0' },
+        //     }}
+        //     textStyle={{
+        //       right: { color: '#fff' },
+        //       left: { color: '#000' },
+        //     }}
+        //   />
+        // )}
+
+        renderBubble={props => {
+          const { currentMessage } = props;
+          return (
+            <View>
+              <Bubble
+                {...props}
+                wrapperStyle={{
+                  right: { backgroundColor: '#1E90FF' },
+                  left: { backgroundColor: '#f0f0f0' },
+                }}
+                textStyle={{
+                  right: { color: '#fff' },
+                  left: { color: '#000' },
+                }}
+              />
+
+              {/* 👇 Agar message pending hai to loader dikhayenge */}
+              {currentMessage?.pending && (
+                <ActivityIndicator
+                  size="small"
+                  color="#1E90FF"
+                  style={{
+                    marginTop: 4,
+                    alignSelf:
+                      currentMessage.user._id === currentUserId.toString()
+                        ? 'flex-end'
+                        : 'flex-start',
+                  }}
+                />
+              )}
+            </View>
+          );
+        }}
+
+
+
+
+
         renderInputToolbar={props => (
           <InputToolbar
             {...props}
@@ -404,6 +537,7 @@ const ChatScreen = ({ route }) => {
             primaryStyle={{ alignItems: 'center' }}
           />
         )}
+        renderMessageImage={renderMessageImage}
         renderSend={props => (
           <TouchableOpacity
             style={{
@@ -423,6 +557,22 @@ const ChatScreen = ({ route }) => {
             <Text style={{ color: '#fff', fontWeight: 'bold' }}>Send</Text>
           </TouchableOpacity>
         )}
+        // inverted={true}
+        loadEarlier={hasMore}       // 👈 dikhayega "Load Earlier"
+        isLoadingEarlier={loading}  // 👈 spinner dikhayega
+        onLoadEarlier={() => getMessageHandle(page + 1)} // 👈 upar scroll pe aur messages fetch
+        listViewProps={{
+          refreshControl: (
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          ),
+        }}
+      />
+
+      <ImageView
+        images={imageMessages}
+        imageIndex={selectedIndex}
+        visible={visible}
+        onRequestClose={() => setIsVisible(false)}
       />
     </SafeAreaView>
   );

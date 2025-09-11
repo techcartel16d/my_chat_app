@@ -3,13 +3,14 @@ import React, { useEffect, useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { screenHeight, screenWidth } from '../utils/Constant'
 import { useNavigation } from '@react-navigation/native'
-import { clearAll } from '../utils/mmkvStorage'
+import { clearAll, getObject, getString } from '../utils/mmkvStorage'
 import api from '../utils/api'
 
 const HomeScreen = () => {
     const { navigate } = useNavigation()
     const [contactList, setContactList] = useState([])
     const [loading, setLoading] = useState(false);
+    const [userInfo, setUserInfo] = useState(null)
 
     const getContactHandler = async () => {
         setLoading(true)
@@ -27,9 +28,15 @@ const HomeScreen = () => {
         }
     }
 
+    const getUser = () => {
+        const user = getObject('user')
+        setUserInfo(user)
+    }
 
     useEffect(() => {
         getContactHandler()
+        getUser()
+
     }, [])
 
     if (loading) {
@@ -51,29 +58,30 @@ const HomeScreen = () => {
                 backgroundColor: '#fff',
             }}>
                 <View style={styles.chatHeader}>
-                    <Text style={styles.headerText}>Contact List</Text>
+                    <Text style={styles.headerText}> id: {userInfo && userInfo.id} </Text>
+                    <Text style={styles.headerText}> name {userInfo && userInfo.name} </Text>
                 </View>
                 <TouchableOpacity onPress={() => {
-                clearAll()
-                navigate("AuthStack")
-            }} style={{
-                width: "40%",
-                height: screenHeight * 4,
-                alignSelf: 'center',
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'blue',
-                borderRadius: screenWidth * 3,
-                marginVertical: screenHeight
-            }}>
-                <Text style={{
-                    fontSize: 18,
-                    color: "#fff"
-                }}>Clear all</Text>
-            </TouchableOpacity>
+                    clearAll()
+                    navigate("AuthStack")
+                }} style={{
+                    width: "40%",
+                    height: screenHeight * 4,
+                    alignSelf: 'center',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: 'blue',
+                    borderRadius: screenWidth * 3,
+                    marginVertical: screenHeight
+                }}>
+                    <Text style={{
+                        fontSize: 18,
+                        color: "#fff"
+                    }}>Clear all</Text>
+                </TouchableOpacity>
 
 
-            {/* <TouchableOpacity onPress={() => navigate("ChatScreen")} style={{
+                {/* <TouchableOpacity onPress={() => navigate("ChatScreen")} style={{
                 width: "40%",
                 height: screenHeight * 4,
                 alignSelf: 'center',
@@ -115,11 +123,11 @@ const HomeScreen = () => {
                                         resizeMode: 'contain'
                                     }} />
                                     <View style={{
-                                        
+
                                     }}>
 
-                                    <Text style={{ color: '#000', fontSize: 18, fontWeight: '600' }}>{item.name}</Text>
-                                    <Text style={{ color: '#000', fontSize: 12, fontWeight: '300' }}>{item.email}</Text>
+                                        <Text style={{ color: '#000', fontSize: 18, fontWeight: '600' }}>{item.name}</Text>
+                                        <Text style={{ color: '#000', fontSize: 12, fontWeight: '300' }}>{item.email}</Text>
                                     </View>
                                 </TouchableOpacity>
                             </View>
