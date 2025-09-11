@@ -36,10 +36,11 @@ const LoginScreen = () => {
             setLoading(true)
             const res = await axios.post('https://chat.threeonline.in/api/login', { email, password });
             if (res.status == 200) {
-
                 setString('token', res.data.token)
                 setObject("user", res.data.user)
                 replace('NoAuthStack')
+            }else{
+                console.log("response====>", res)
             }
 
         } catch (error) {

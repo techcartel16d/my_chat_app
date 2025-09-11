@@ -42,6 +42,7 @@ react {
     //   A list of extra flags to pass to the 'bundle' commands.
     //   See https://github.com/react-native-community/cli/blob/main/docs/commands.md#bundle
     // extraPackagerArgs = []
+    apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
 
     /* Hermes Commands */
     //   The hermes compiler command to run. By default it is 'hermesc'
@@ -110,6 +111,7 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation project(':react-native-vector-icons')
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
