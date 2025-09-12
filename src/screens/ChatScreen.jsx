@@ -34,57 +34,8 @@ const ChatScreen = ({ route }) => {
   const [messages, setMessages] = useState([]);
 
 
-  // Map API messages to GiftedChat format
-  // const mapApiMessagesToGiftedChat = apiMessages => {
-  //   return apiMessages.map(msg => {
-  //     let newMsg = {
-  //       _id: msg.id,
-  //       text: msg.body || msg.message || '',
-  //       createdAt: new Date(msg.created_at),
-  //       user: {
-  //         _id: msg.from_id.toString(),
-  //         name: msg.from_id === currentUserId ? 'You' : 'User ' + msg.from_id,
-  //         avatar: 'https://i.pravatar.cc/150?img=' + msg.from_id,
-  //       },
-  //     };
 
 
-  //     // 👉 Attachment parse
-
-
-
-
-  //     if (msg.attachment) {
-  //       try {
-  //         const file = JSON.parse(msg.attachment);
-
-
-  //         // check extension
-  //         const ext = file.new_name.split('.').pop().toLowerCase();
-
-
-  //         if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-  //           // agar image hai to GiftedChat image field me set karo
-  //           newMsg.image = `https://chat.threeonline.in/storage/attachments/${file.new_name}`;
-  //         } else {
-  //           // agar document/file hai
-  //           newMsg.text = `📎 ${file.old_name}`;
-  //           newMsg.file = `https://chat.threeonline.in/storage/attachments/${file.new_name}`;
-  //         }
-  //       } catch (e) {
-  //         console.log('Attachment parse error:', e);
-  //       }
-  //     }
-
-
-  //     return newMsg;
-  //   });
-  // };
-
-
-
-
-  // this is the updated function with video support
   // const mapApiMessagesToGiftedChat = (messages) => {
   //   return messages.map(msgObj => {
   //     const senderId = parseInt(msgObj.from_id);
@@ -107,7 +58,7 @@ const ChatScreen = ({ route }) => {
   //     }
 
 
-  //     // Handle attachment if present
+  //     // Attachment handling
   //     if (msgObj.attachment) {
   //       let attachmentData;
   //       try {
@@ -118,23 +69,17 @@ const ChatScreen = ({ route }) => {
 
 
   //       if (attachmentData && attachmentData.new_name) {
-  //         // Construct file URL (update according to your storage setup)
   //         const fileUrl = `https://chat.threeonline.in/storage/attachments/${attachmentData.new_name}`;
   //         const ext = attachmentData.old_name?.split('.').pop().toLowerCase() || '';
 
 
-  //         // Images
   //         if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
   //           newMsg.image = fileUrl;
   //           if (!msgObj.body) delete newMsg.text; // remove empty text
-  //         }
-  //         // Videos
-  //         else if (['mp4', 'mov', 'avi', 'webm'].includes(ext)) {
+  //         } else if (['mp4', 'mov', 'avi', 'webm'].includes(ext)) {
   //           newMsg.video = fileUrl;
   //           if (!msgObj.body) delete newMsg.text;
-  //         }
-  //         // Other files
-  //         else {
+  //         } else {
   //           newMsg.text = `📎 ${attachmentData.old_name || 'File attached'}`;
   //           newMsg.file = fileUrl;
   //         }
@@ -147,65 +92,53 @@ const ChatScreen = ({ route }) => {
   // };
 
 
-
-
-
-
   const mapApiMessagesToGiftedChat = (messages) => {
     return messages.map(msgObj => {
       const senderId = parseInt(msgObj.from_id);
 
+      // Prefix server messages to avoid conflict with temp messages
+      const msgId = `server_${msgObj.id}`;
 
       let newMsg = {
-        _id: msgObj.id,
+        _id: msgId,
         createdAt: new Date(msgObj.created_at),
         user: {
           _id: senderId.toString(),
-          name: senderId === currentUserId ? 'You' : 'User ' + senderId,
-          avatar: 'https://i.pravatar.cc/150?img=' + senderId,
+          name: senderId === currentUserId ? "You" : "User " + senderId,
+          avatar: "https://i.pravatar.cc/150?img=" + senderId,
         },
       };
 
-
-      // Assign text if present
-      if (msgObj.body && msgObj.body.trim() !== '') {
+      if (msgObj.body && msgObj.body.trim() !== "") {
         newMsg.text = msgObj.body;
       }
 
-
-      // Attachment handling
       if (msgObj.attachment) {
-        let attachmentData;
         try {
-          attachmentData = JSON.parse(msgObj.attachment);
-        } catch (err) {
-          console.log('❌ Invalid attachment JSON:', msgObj.attachment);
-        }
+          const attachmentData = JSON.parse(msgObj.attachment);
+          const fileUrl = attachmentData.new_name.startsWith("http")
+            ? attachmentData.new_name
+            : `https://chat.threeonline.in/storage/attachments/${attachmentData.new_name}`;
+          const ext = attachmentData.old_name?.split(".").pop().toLowerCase();
 
-
-        if (attachmentData && attachmentData.new_name) {
-          const fileUrl = `https://chat.threeonline.in/storage/attachments/${attachmentData.new_name}`;
-          const ext = attachmentData.old_name?.split('.').pop().toLowerCase() || '';
-
-
-          if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+          if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
             newMsg.image = fileUrl;
-            if (!msgObj.body) delete newMsg.text; // remove empty text
-          } else if (['mp4', 'mov', 'avi', 'webm'].includes(ext)) {
+            newMsg.text = "";
+          } else if (["mp4", "mov", "avi", "webm"].includes(ext)) {
             newMsg.video = fileUrl;
-            if (!msgObj.body) delete newMsg.text;
+            newMsg.text = "";
           } else {
-            newMsg.text = `📎 ${attachmentData.old_name || 'File attached'}`;
+            newMsg.text = `📎 ${attachmentData.old_name || "File attached"}`;
             newMsg.file = fileUrl;
           }
+        } catch (err) {
+          console.log("❌ Invalid attachment JSON:", msgObj.attachment);
         }
       }
-
 
       return newMsg;
     });
   };
-
 
 
 
@@ -234,37 +167,37 @@ const ChatScreen = ({ route }) => {
   const getMessageHandle = async (pageNumber = 1, isRefresh = false) => {
     if (!currentId || loading) return;
 
-
     try {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-
-      const res = await api.post("fetchMessages", {
-        id: currentId,
-        page: pageNumber,
-        limit: 30,
-      });
-
-
+      const res = await api.post("fetchMessages", { id: currentId });
       const fetchedMessages = res.data.messages;
+
       console.log("Fetched messages:", fetchedMessages);
+
       const formattedMessages = mapApiMessagesToGiftedChat(fetchedMessages);
 
-
       if (pageNumber === 1) {
-        setMessages(formattedMessages);
+        // On refresh, remove duplicates by checking _id
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m._id));
+          const uniqueMessages = formattedMessages.filter(m => !existingIds.has(m._id));
+          return GiftedChat.append(uniqueMessages, prev);
+        });
       } else {
-        setMessages(prev =>
-          GiftedChat.prepend(prev, formattedMessages)
-        );
+        // On load more, remove duplicates before prepending
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m._id));
+          const uniqueMessages = formattedMessages.filter(m => !existingIds.has(m._id));
+          return GiftedChat.prepend(prev, uniqueMessages);
+        });
       }
 
-
+      // If less than 30 messages, no more pages
       if (fetchedMessages.length < 30) {
         setHasMore(false);
       }
-
 
       setPage(pageNumber);
     } catch (error) {
@@ -504,98 +437,150 @@ const ChatScreen = ({ route }) => {
   );
 
 
-  // // 📤 Common send function (text + file dono ke liye)
+
+
   // const sendMessageToApi = async ({ text, fileUri, fileName, type }) => {
+  //   console.log("sendMessageToApi called with:", { text, fileUri, fileName, type });
   //   const tempId = uuid.v4();
 
 
-  //   // 👀 Local preview
+  //   // 👀 Local preview message
   //   let previewMsg = {
   //     _id: tempId,
   //     createdAt: new Date(),
-  //     user: { _id: currentUserId.toString(), name: 'You' },
+  //     user: { _id: currentUserId.toString(), name: "You" },
   //     pending: true,
   //   };
 
 
   //   if (text) previewMsg.text = text;
-  //   if (type === 'image') previewMsg.image = fileUri;
-  //   if (type === 'video') previewMsg.video = fileUri;
-  //   if (type === 'document')
-  //     previewMsg.text = `📎 ${fileName || 'File attached'}`;
+  //   if (type === "image") previewMsg.image = fileUri;
+  //   if (type === "video") previewMsg.video = fileUri;
+  //   if (type === "document") previewMsg.text = `📎 ${fileName || "File attached"}`;
 
 
-  //   setMessages(prev => GiftedChat.append(prev, [previewMsg]));
+  //   setMessages((prev) => GiftedChat.append(prev, [previewMsg]));
 
 
   //   try {
-  //     let res;
-  //     if (fileUri) {
-  //       const formData = new FormData();
+  //     let uploadUri = fileUri;
+  //     // ✅ Video compression
+  //     if (type === "video") {
+  //       console.log("📹 Compressing video...");
+  //       uploadUri = await VideoCompressor.compress(
+  //         fileUri,
+  //         { compressionMethod: "auto" },
+  //         (progress) => console.log("Compression progress:", progress)
+  //       );
+  //       console.log("✅ Compressed Video Path:", uploadUri);
+  //     }
 
 
-  //       formData.append('id', currentId.toString());
-  //       formData.append('type', 'user');
-  //       formData.append('temporaryMsgId', tempId);
+  //     // Prepare multipart/form-data
+  //     const finalName =
+  //       fileName ||
+  //       `${Date.now()}.${type === "image" ? "jpg" : type === "video" ? "mp4" : "bin"
+  //       }`;
 
 
-  //       if (text) {
-  //         formData.append('message', text);
+  //     let formData = [
+  //       { name: "id", data: currentId.toString() },
+  //       { name: "type", data: "user" },
+  //       { name: "temporaryMsgId", data: tempId },
+  //     ];
+
+
+  //     if (text) formData.push({ name: "message", data: text });
+
+
+  //     if (type) {
+  //       formData.push({
+  //         name: "file",
+  //         filename: finalName,
+  //         type:
+  //           type === "image"
+  //             ? "image/jpeg"
+  //             : type === "video"
+  //               ? "video/mp4"
+  //               : "application/octet-stream",
+  //         data: RNFetchBlob.wrap(
+  //           Platform.OS === "ios" ? uploadUri.replace("file://", "") : uploadUri
+  //         ),
+  //       });
+  //     }
+
+
+  //     const res = await RNFetchBlob.fetch(
+  //       "POST",
+  //       "https://chat.threeonline.in/chatify/api/sendMessage",
+  //       {
+  //         Authorization: `Bearer ${getString("token")}`,
+  //         "Content-Type": "multipart/form-data",
+  //         "X-Socket-Id": getString("socketId") || "",
+  //       },
+  //       formData
+  //     );
+
+
+  //     let serverRes;
+  //     try {
+  //       serverRes = res.json();
+  //     } catch {
+  //       serverRes = res.data;
+  //     }
+
+
+  //     // 🟢 Map server response to GiftedChat message
+  //     let newMsg = {
+  //       _id: serverRes.id?.toString() || tempId,
+  //       createdAt: new Date(serverRes.created_at || new Date()),
+  //       user: { _id: currentUserId.toString(), name: "You" },
+  //       pending: false,
+  //     };
+
+
+  //     // Text
+  //     if (text) newMsg.text = text;
+
+
+  //     // Attachment
+  //     if (serverRes.attachment) {
+  //       try {
+  //         const attachmentData = JSON.parse(serverRes.attachment);
+  //         const ext = attachmentData.old_name?.split(".").pop().toLowerCase();
+  //         const fileUrl = `https://chat.threeonline.in/storage/attachments/${attachmentData.new_name}`;
+
+
+  //         if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
+  //           newMsg.image = fileUrl;
+  //           if (!text) delete newMsg.text;
+  //         } else if (["mp4", "mov", "avi", "webm"].includes(ext)) {
+  //           newMsg.video = fileUrl;
+  //           if (!text) delete newMsg.text;
+  //         } else {
+  //           newMsg.text = `📎 ${attachmentData.old_name || "File attached"}`;
+  //           newMsg.file = fileUrl;
+  //         }
+  //       } catch (err) {
+  //         console.log("❌ Invalid attachment JSON:", serverRes.attachment);
   //       }
-
-
-  //       let fileType = 'application/octet-stream';
-  //       if (type === 'image') fileType = 'image/*';
-  //       if (type === 'video') fileType = 'video/*';
-
-
-  //       const finalName = fileName || `${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`;
-
-
-  //       formData.append('file', {
-  //         uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
-  //         type: fileType,
-  //         name: finalName,
-  //       });
-
-
-  //       // 🚀 Header yahan mat do, interceptor handle karega
-  //       res = await api.post('/sendMessage', formData);
   //     }
 
 
-  //     else {
-  //       // ✉️ Agar sirf text hai
-  //       res = await api.post('/sendMessage', {
-  //         file: null,
-  //         id: currentId.toString(),
-  //         type: 'user',
-  //         temporaryMsgId: tempId,
-  //         message: text || '',
-  //       });
-  //     }
-
-
-  //     console.log('✅ Sent to API:', res.data);
-
-
-  //     // Update local message with server ID
-  //     setMessages(prev =>
-  //       prev.map(m =>
-  //         m._id === tempId
-  //           ? { ...m, _id: res.data.id?.toString() || tempId, pending: false }
-  //           : m,
-  //       ),
+  //     // Update message in state
+  //     setMessages((prev) =>
+  //       prev.map((m) => (m._id === tempId ? newMsg : m))
   //     );
   //   } catch (err) {
-  //     console.log('❌ Send error', err);
+  //     console.log("❌ Send error", err);
   //   }
   // };
 
 
-  const sendMessageToApi = async ({ text, fileUri, fileName, type }) => {
-    const tempId = uuid.v4();
 
+  const sendMessageToApi = async ({ text, fileUri, fileName, type }) => {
+    console.log("sendMessageToApi called with:", { text, fileUri, fileName, type });
+    const tempId = uuid.v4();
 
     // 👀 Local preview message
     let previewMsg = {
@@ -605,19 +590,16 @@ const ChatScreen = ({ route }) => {
       pending: true,
     };
 
-
     if (text) previewMsg.text = text;
     if (type === "image") previewMsg.image = fileUri;
     if (type === "video") previewMsg.video = fileUri;
     if (type === "document") previewMsg.text = `📎 ${fileName || "File attached"}`;
 
-
+    // ⏩ Add preview to state
     setMessages((prev) => GiftedChat.append(prev, [previewMsg]));
-
 
     try {
       let uploadUri = fileUri;
-
 
       // ✅ Video compression
       if (type === "video") {
@@ -630,13 +612,10 @@ const ChatScreen = ({ route }) => {
         console.log("✅ Compressed Video Path:", uploadUri);
       }
 
-
       // Prepare multipart/form-data
       const finalName =
         fileName ||
-        `${Date.now()}.${type === "image" ? "jpg" : type === "video" ? "mp4" : "bin"
-        }`;
-
+        `${Date.now()}.${type === "image" ? "jpg" : type === "video" ? "mp4" : "bin"}`;
 
       let formData = [
         { name: "id", data: currentId.toString() },
@@ -644,9 +623,7 @@ const ChatScreen = ({ route }) => {
         { name: "temporaryMsgId", data: tempId },
       ];
 
-
       if (text) formData.push({ name: "message", data: text });
-
 
       if (type) {
         formData.push({
@@ -664,7 +641,6 @@ const ChatScreen = ({ route }) => {
         });
       }
 
-
       const res = await RNFetchBlob.fetch(
         "POST",
         "https://chat.threeonline.in/chatify/api/sendMessage",
@@ -676,14 +652,12 @@ const ChatScreen = ({ route }) => {
         formData
       );
 
-
       let serverRes;
       try {
         serverRes = res.json();
       } catch {
         serverRes = res.data;
       }
-
 
       // 🟢 Map server response to GiftedChat message
       let newMsg = {
@@ -693,18 +667,15 @@ const ChatScreen = ({ route }) => {
         pending: false,
       };
 
-
       // Text
       if (text) newMsg.text = text;
 
-
-      // Attachment
+      // Attachment from server
       if (serverRes.attachment) {
         try {
           const attachmentData = JSON.parse(serverRes.attachment);
           const ext = attachmentData.old_name?.split(".").pop().toLowerCase();
           const fileUrl = `https://chat.threeonline.in/storage/attachments/${attachmentData.new_name}`;
-
 
           if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
             newMsg.image = fileUrl;
@@ -721,20 +692,20 @@ const ChatScreen = ({ route }) => {
         }
       }
 
+      // 🟢 Fallback: अगर server से attachment नहीं आया तो local preview use करो
+      if (!newMsg.image && previewMsg.image) {
+        newMsg.image = previewMsg.image;
+      }
+      if (!newMsg.video && previewMsg.video) {
+        newMsg.video = previewMsg.video;
+      }
 
       // Update message in state
-      setMessages((prev) =>
-        prev.map((m) => (m._id === tempId ? newMsg : m))
-      );
+      setMessages((prev) => prev.map((m) => (m._id === tempId ? newMsg : m)));
     } catch (err) {
       console.log("❌ Send error", err);
     }
   };
-
-
-
-
-
 
 
 
@@ -808,7 +779,7 @@ const ChatScreen = ({ route }) => {
 
   // ✅ Custom Image renderer
   const renderMessageImage = (props) => {
-    console.log("props", props)
+    // console.log("props", props)
     const currentIndex = imageMessages.findIndex(
       (img) => img.uri === props.currentMessage.image
     );
@@ -869,7 +840,6 @@ const ChatScreen = ({ route }) => {
 
     return (
       <View>
-        {/* Image */}
         {fileType === 'mp4' ? (
           // 🎥 Video Message
           <View
@@ -961,58 +931,7 @@ const ChatScreen = ({ route }) => {
         alwaysShowSend
         scrollToBottom
         renderActions={renderCustomActions}
-        // renderBubble={props => (
-        //   <Bubble
-        //     {...props}
-        //     wrapperStyle={{
-        //       right: { backgroundColor: '#1E90FF' },
-        //       left: { backgroundColor: '#f0f0f0' },
-        //     }}
-        //     textStyle={{
-        //       right: { color: '#fff' },
-        //       left: { color: '#000' },
-        //     }}
-        //   />
-        // )}
-
-
         renderBubble={props => renderBubble(props, currentUserId)}
-
-
-        // renderBubble={props => {
-        //   const { currentMessage } = props;
-        //   return (
-        //     <View>
-        //       <Bubble
-        //         {...props}
-        //         wrapperStyle={{
-        //           right: { backgroundColor: '#1E90FF' },
-        //           left: { backgroundColor: '#f0f0f0' },
-        //         }}
-        //         textStyle={{
-        //           right: { color: '#fff' },
-        //           left: { color: '#000' },
-        //         }}
-        //       />
-
-
-        //       {/* 👇 Agar message pending hai to loader dikhayenge */}
-        //       {currentMessage?.pending && (
-        //         <ActivityIndicator
-        //           size="small"
-        //           color="#1E90FF"
-        //           style={{
-        //             marginTop: 4,
-        //             alignSelf:
-        //               currentMessage.user._id === currentUserId.toString()
-        //                 ? 'flex-end'
-        //                 : 'flex-start',
-        //           }}
-        //         />
-        //       )}
-        //     </View>
-        //   );
-        // }}
         renderInputToolbar={props => (
           <InputToolbar
             {...props}

@@ -11,48 +11,76 @@ import {
     Platform,
     ScrollView,
     View,
+    ActivityIndicator,
 } from 'react-native';
 
-import { setObject, setString } from '../../utils/mmkvStorage'
-
-
+import { getString, setObject, setString } from '../../utils/mmkvStorage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const LoginScreen = () => {
-    const { replace } = useNavigation()
-    const [loading, setLoading] = useState(false)
+    const { replace } = useNavigation();
+
+    const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false); // toggle state
+    const [showPassword, setShowPassword] = useState(false);
 
-    const handleLogin = async () => {
-        if (!email || !password) {
+    const fcmToken = getString('fcm_token');
+    console.log("📲 In login screen FCM Token:", fcmToken);
+
+    // ✅ Input validation
+    const validateInputs = () => {
+        if (!email.trim() || !password.trim()) {
             Alert.alert('Error', 'Please enter both email and password');
-
-            return;
+            return false;
         }
+        return true;
+    };
+
+    // ✅ Handle Login API
+    const handleLogin = async () => {
+        if (!validateInputs()) return;
+
+        const loginData = {
+            email: email.trim(),
+            password: password.trim(),
+            fcm_token: fcmToken
+        };
 
         try {
-            setLoading(true)
-            const res = await axios.post('https://chat.threeonline.in/api/login', { email, password });
-            if (res.status == 200) {
-                setString('token', res.data.token)
-                setObject("user", res.data.user)
-                replace('NoAuthStack')
-            }else{
-                console.log("response====>", res)
+            setLoading(true);
+
+            const res = await axios.post(
+                'https://chat.threeonline.in/api/login',
+                loginData,
+                { timeout: 10000 } // 10s timeout
+            );
+
+            if (res?.status === 200 && res?.data?.token) {
+                console.log("✅ Login Success:", res.data);
+
+                // Save token + user in local storage
+                setString('token', res.data.token);
+                setObject("user", res.data.user);
+
+                replace('NoAuthStack');
+            } else {
+                console.log("⚠️ Unexpected response:", res);
+                Alert.alert('Login Failed', res?.data?.message || 'Something went wrong');
             }
-
         } catch (error) {
-            console.log("ERROR IN LOGIN ", error)
+            console.log("❌ ERROR IN LOGIN:", error?.response || error?.message);
 
+            if (error?.response?.status === 401) {
+                Alert.alert('Invalid Credentials', 'Email or password is incorrect');
+            } else if (error?.response?.status === 500) {
+                Alert.alert('Server Error', 'Please try again later');
+            } else {
+                Alert.alert('Error', error?.message || 'Network error, try again');
+            }
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
-
-        // console.log('Email:', email);
-        // console.log('Password:', password);
-        // Alert.alert('Success', 'Login clicked');
     };
 
     return (
@@ -75,7 +103,7 @@ const LoginScreen = () => {
                         keyboardType="email-address"
                         autoCapitalize="none"
                         autoCorrect={false}
-                        placeholderTextColor={'#000'}
+                        placeholderTextColor={'#999'}
                     />
 
                     <View style={styles.passwordContainer}>
@@ -84,8 +112,8 @@ const LoginScreen = () => {
                             placeholder="Password"
                             value={password}
                             onChangeText={setPassword}
-                            secureTextEntry={!showPassword} // toggle visibility
-                            placeholderTextColor={'#000'}
+                            secureTextEntry={!showPassword}
+                            placeholderTextColor={'#999'}
                         />
                         <TouchableOpacity
                             style={styles.showHideButton}
@@ -97,12 +125,16 @@ const LoginScreen = () => {
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-                        <Text style={styles.buttonText}>
-                            {
-                                loading ? "Please wait..." : "Login"
-                            }
-                        </Text>
+                    <TouchableOpacity
+                        style={[styles.button, loading && { opacity: 0.7 }]}
+                        onPress={handleLogin}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.buttonText}>Login</Text>
+                        )}
                     </TouchableOpacity>
                 </KeyboardAvoidingView>
             </ScrollView>
@@ -127,6 +159,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginBottom: 30,
         alignSelf: 'center',
+        color: '#333'
     },
     input: {
         backgroundColor: '#fff',
@@ -135,7 +168,9 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginBottom: 15,
         fontSize: 16,
-        color: '#000'
+        color: '#000',
+        borderWidth: 1,
+        borderColor: '#ddd',
     },
     passwordContainer: {
         position: 'relative',
@@ -147,8 +182,9 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 8,
         fontSize: 16,
-        color: '#000'
-
+        color: '#000',
+        borderWidth: 1,
+        borderColor: '#ddd',
     },
     showHideButton: {
         position: 'absolute',
