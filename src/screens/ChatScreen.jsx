@@ -1,8 +1,9 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { ActivityIndicator, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GiftedChat, Bubble, InputToolbar } from 'react-native-gifted-chat';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Video as VideoCompressor } from "react-native-compressor";
+import Video from 'react-native-video';
 import { screenWidth } from '../utils/Constant';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import api from '../utils/api';
@@ -27,49 +28,187 @@ const ChatScreen = ({ route }) => {
   const [hasMore, setHasMore] = useState(true);
 
 
+
+
   const currentUserId = authValue.userId; // logged-in user
   const [messages, setMessages] = useState([]);
 
+
   // Map API messages to GiftedChat format
-  const mapApiMessagesToGiftedChat = apiMessages => {
-    return apiMessages.map(msg => {
+  // const mapApiMessagesToGiftedChat = apiMessages => {
+  //   return apiMessages.map(msg => {
+  //     let newMsg = {
+  //       _id: msg.id,
+  //       text: msg.body || msg.message || '',
+  //       createdAt: new Date(msg.created_at),
+  //       user: {
+  //         _id: msg.from_id.toString(),
+  //         name: msg.from_id === currentUserId ? 'You' : 'User ' + msg.from_id,
+  //         avatar: 'https://i.pravatar.cc/150?img=' + msg.from_id,
+  //       },
+  //     };
+
+
+  //     // 👉 Attachment parse
+
+
+
+
+  //     if (msg.attachment) {
+  //       try {
+  //         const file = JSON.parse(msg.attachment);
+
+
+  //         // check extension
+  //         const ext = file.new_name.split('.').pop().toLowerCase();
+
+
+  //         if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+  //           // agar image hai to GiftedChat image field me set karo
+  //           newMsg.image = `https://chat.threeonline.in/storage/attachments/${file.new_name}`;
+  //         } else {
+  //           // agar document/file hai
+  //           newMsg.text = `📎 ${file.old_name}`;
+  //           newMsg.file = `https://chat.threeonline.in/storage/attachments/${file.new_name}`;
+  //         }
+  //       } catch (e) {
+  //         console.log('Attachment parse error:', e);
+  //       }
+  //     }
+
+
+  //     return newMsg;
+  //   });
+  // };
+
+
+
+
+  // this is the updated function with video support
+  // const mapApiMessagesToGiftedChat = (messages) => {
+  //   return messages.map(msgObj => {
+  //     const senderId = parseInt(msgObj.from_id);
+
+
+  //     let newMsg = {
+  //       _id: msgObj.id,
+  //       createdAt: new Date(msgObj.created_at),
+  //       user: {
+  //         _id: senderId.toString(),
+  //         name: senderId === currentUserId ? 'You' : 'User ' + senderId,
+  //         avatar: 'https://i.pravatar.cc/150?img=' + senderId,
+  //       },
+  //     };
+
+
+  //     // Assign text if present
+  //     if (msgObj.body && msgObj.body.trim() !== '') {
+  //       newMsg.text = msgObj.body;
+  //     }
+
+
+  //     // Handle attachment if present
+  //     if (msgObj.attachment) {
+  //       let attachmentData;
+  //       try {
+  //         attachmentData = JSON.parse(msgObj.attachment);
+  //       } catch (err) {
+  //         console.log('❌ Invalid attachment JSON:', msgObj.attachment);
+  //       }
+
+
+  //       if (attachmentData && attachmentData.new_name) {
+  //         // Construct file URL (update according to your storage setup)
+  //         const fileUrl = `https://chat.threeonline.in/storage/attachments/${attachmentData.new_name}`;
+  //         const ext = attachmentData.old_name?.split('.').pop().toLowerCase() || '';
+
+
+  //         // Images
+  //         if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+  //           newMsg.image = fileUrl;
+  //           if (!msgObj.body) delete newMsg.text; // remove empty text
+  //         }
+  //         // Videos
+  //         else if (['mp4', 'mov', 'avi', 'webm'].includes(ext)) {
+  //           newMsg.video = fileUrl;
+  //           if (!msgObj.body) delete newMsg.text;
+  //         }
+  //         // Other files
+  //         else {
+  //           newMsg.text = `📎 ${attachmentData.old_name || 'File attached'}`;
+  //           newMsg.file = fileUrl;
+  //         }
+  //       }
+  //     }
+
+
+  //     return newMsg;
+  //   });
+  // };
+
+
+
+
+
+
+  const mapApiMessagesToGiftedChat = (messages) => {
+    return messages.map(msgObj => {
+      const senderId = parseInt(msgObj.from_id);
+
+
       let newMsg = {
-        _id: msg.id,
-        text: msg.body || msg.message || '',
-        createdAt: new Date(msg.created_at),
+        _id: msgObj.id,
+        createdAt: new Date(msgObj.created_at),
         user: {
-          _id: msg.from_id.toString(),
-          name: msg.from_id === currentUserId ? 'You' : 'User ' + msg.from_id,
-          avatar: 'https://i.pravatar.cc/150?img=' + msg.from_id,
+          _id: senderId.toString(),
+          name: senderId === currentUserId ? 'You' : 'User ' + senderId,
+          avatar: 'https://i.pravatar.cc/150?img=' + senderId,
         },
       };
 
-      // 👉 Attachment parse
+
+      // Assign text if present
+      if (msgObj.body && msgObj.body.trim() !== '') {
+        newMsg.text = msgObj.body;
+      }
 
 
-      if (msg.attachment) {
+      // Attachment handling
+      if (msgObj.attachment) {
+        let attachmentData;
         try {
-          const file = JSON.parse(msg.attachment);
+          attachmentData = JSON.parse(msgObj.attachment);
+        } catch (err) {
+          console.log('❌ Invalid attachment JSON:', msgObj.attachment);
+        }
 
-          // check extension
-          const ext = file.new_name.split('.').pop().toLowerCase();
+
+        if (attachmentData && attachmentData.new_name) {
+          const fileUrl = `https://chat.threeonline.in/storage/attachments/${attachmentData.new_name}`;
+          const ext = attachmentData.old_name?.split('.').pop().toLowerCase() || '';
+
 
           if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-            // agar image hai to GiftedChat image field me set karo
-            newMsg.image = `https://chat.threeonline.in/storage/attachments/${file.new_name}`;
+            newMsg.image = fileUrl;
+            if (!msgObj.body) delete newMsg.text; // remove empty text
+          } else if (['mp4', 'mov', 'avi', 'webm'].includes(ext)) {
+            newMsg.video = fileUrl;
+            if (!msgObj.body) delete newMsg.text;
           } else {
-            // agar document/file hai
-            newMsg.text = `📎 ${file.old_name}`;
-            newMsg.file = `https://chat.threeonline.in/storage/attachments/${file.new_name}`;
+            newMsg.text = `📎 ${attachmentData.old_name || 'File attached'}`;
+            newMsg.file = fileUrl;
           }
-        } catch (e) {
-          console.log('Attachment parse error:', e);
         }
       }
+
 
       return newMsg;
     });
   };
+
+
+
+
 
 
 
@@ -89,13 +228,17 @@ const ChatScreen = ({ route }) => {
   // };
 
 
+
+
   // API Call
   const getMessageHandle = async (pageNumber = 1, isRefresh = false) => {
     if (!currentId || loading) return;
 
+
     try {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
+
 
       const res = await api.post("fetchMessages", {
         id: currentId,
@@ -103,8 +246,11 @@ const ChatScreen = ({ route }) => {
         limit: 30,
       });
 
+
       const fetchedMessages = res.data.messages;
+      console.log("Fetched messages:", fetchedMessages);
       const formattedMessages = mapApiMessagesToGiftedChat(fetchedMessages);
+
 
       if (pageNumber === 1) {
         setMessages(formattedMessages);
@@ -114,9 +260,11 @@ const ChatScreen = ({ route }) => {
         );
       }
 
+
       if (fetchedMessages.length < 30) {
         setHasMore(false);
       }
+
 
       setPage(pageNumber);
     } catch (error) {
@@ -126,6 +274,7 @@ const ChatScreen = ({ route }) => {
       setRefreshing(false);
     }
   };
+
 
   // Pull to Refresh handler
   const onRefresh = () => {
@@ -138,10 +287,16 @@ const ChatScreen = ({ route }) => {
 
 
 
+
+
+
+
+
   // Subscribe to Pusher events
   useFocusEffect(
     useCallback(() => {
       const channelName = `private-chatify.${currentUserId}`;
+
 
       subscribeChannel({
         channelName,
@@ -149,11 +304,14 @@ const ChatScreen = ({ route }) => {
         onEvent: data => {
           console.log('📥 Messaging event:', data);
 
+
           if (!data || !data.message) return;
+
 
           const msgObj = data.message;
           const senderId = parseInt(data.from_id);
           const receiverId = parseInt(data.to_id);
+
 
           if (
             (senderId === currentId && receiverId === currentUserId) ||
@@ -169,9 +327,11 @@ const ChatScreen = ({ route }) => {
               },
             };
 
+
             if (msgObj.message && msgObj.message.trim() !== '') {
               newMsg.text = msgObj.message;
             }
+
 
             if (msgObj.attachment && msgObj.attachment.file) {
               if (msgObj.attachment.type === 'image') {
@@ -185,14 +345,156 @@ const ChatScreen = ({ route }) => {
               }
             }
 
+
             setMessages(prev => GiftedChat.append(prev, [newMsg]));
           } else {
             console.log('📥 Background message (dusre chat ka):', data);
           }
         },
+
+
+
+
+        // onEvent: data => {
+        //   console.log('📥 Messaging event:', data);
+
+
+        //   if (!data || !data.message) return;
+
+
+        //   const msgObj = data.message;
+        //   const senderId = parseInt(data.from_id);
+        //   const receiverId = parseInt(data.to_id);
+
+
+        //   if (
+        //     (senderId === currentId && receiverId === currentUserId) ||
+        //     (senderId === currentUserId && receiverId === currentId)
+        //   ) {
+        //     let newMsg = {
+        //       _id: msgObj.id,
+        //       createdAt: new Date(msgObj.created_at),
+        //       user: {
+        //         _id: senderId.toString(),
+        //         name: senderId === currentUserId ? 'You' : 'User ' + senderId,
+        //         avatar: 'https://i.pravatar.cc/150?img=' + senderId,
+        //       },
+        //     };
+
+
+        //     // ✅ Text message
+        //     if (msgObj.message && msgObj.message.trim() !== '') {
+        //       newMsg.text = msgObj.message;
+        //     }
+
+
+        //     // 📎 Attachment handling
+        //     if (msgObj.attachment && msgObj.attachment.file) {
+        //       const fileUrl = msgObj.attachment.file.startsWith('http')
+        //         ? msgObj.attachment.file
+        //         : `https://chat.threeonline.in/storage/attachments/${msgObj.attachment.file}`;
+
+
+        //       const type = msgObj.attachment.type;
+        //       const ext = msgObj.attachment.title?.split('.').pop().toLowerCase() || '';
+
+
+        //       if (type === 'image') {
+        //         newMsg.image = fileUrl; // GiftedChat image prop
+        //         newMsg.text = ''; // optional
+        //       } else if (type === 'file') {
+        //         if (['mp4', 'mov', 'avi', 'webm'].includes(ext)) {
+        //           newMsg.video = fileUrl; // GiftedChat video prop
+        //           newMsg.text = ''; // optional
+        //         } else {
+        //           // Other document types
+        //           newMsg.text = `📎 ${msgObj.attachment.title || 'File attached'}`;
+        //           newMsg.file = fileUrl; // optional, if you want to handle click separately
+        //         }
+        //       }
+        //     }
+
+
+        //     setMessages(prev => GiftedChat.append(prev, [newMsg]));
+        //   } else {
+        //     console.log('📥 Background message (dusre chat ka):', data);
+        //   }
+        // }
+
+
+
+
+
+
+        // onEvent: data => {
+        //   console.log('📥 Messaging event:', data);
+
+
+
+
+        //   if (!data || !data.message) return;
+
+
+        //   const msgObj = data.message;
+        //   const senderId = parseInt(data.from_id);
+        //   const receiverId = parseInt(data.to_id);
+
+
+        //   if (
+        //     (senderId === currentId && receiverId === currentUserId) ||
+        //     (senderId === currentUserId && receiverId === currentId)
+        //   ) {
+        //     let newMsg = {
+        //       _id: msgObj.id,
+        //       createdAt: new Date(msgObj.created_at),
+        //       user: {
+        //         _id: senderId.toString(),
+        //         name: senderId === currentUserId ? 'You' : 'User ' + senderId,
+        //         avatar: 'https://i.pravatar.cc/150?img=' + senderId,
+        //       },
+        //     };
+
+
+        //     if (msgObj.message && msgObj.message.trim() !== '') {
+        //       newMsg.text = msgObj.message;
+        //     }
+
+
+
+
+        //     if (msgObj.attachment && msgObj.attachment.file) {
+        //       if (msgObj.attachment.type === 'image') {
+        //         newMsg = {
+        //           ...newMsg,
+        //           text: '',
+        //           image: msgObj.attachment.file.startsWith('http')
+        //             ? msgObj.attachment.file
+        //             : `https://chat.threeonline.in/storage/attachments/${msgObj.attachment.file}`,
+        //         };
+        //       } else if (msgObj.attachment.type === "file") {
+        //         newMsg = {
+        //           ...newMsg,
+        //           text: '',
+        //           video: msgObj.attachment.file.startsWith('http')
+        //             ? msgObj.attachment.file
+        //             : `https://chat.threeonline.in/storage/attachments/${msgObj.attachment.file}`,
+        //         };
+        //       } else {
+        //         newMsg.text = msgObj.attachment.title || '📎 File attached';
+        //       }
+        //     }
+
+
+        //     setMessages(prev => GiftedChat.append(prev, [newMsg]));
+        //   } else {
+        //     console.log('📥 Background message (dusre chat ka):', data);
+        //   }
+        // },
       });
 
+
       getMessageHandle();
+
 
       // 👇 Cleanup jab screen blur hogi
       return () => {
@@ -201,9 +503,11 @@ const ChatScreen = ({ route }) => {
     }, [currentId, currentUserId])
   );
 
+
   // // 📤 Common send function (text + file dono ke liye)
   // const sendMessageToApi = async ({ text, fileUri, fileName, type }) => {
   //   const tempId = uuid.v4();
+
 
   //   // 👀 Local preview
   //   let previewMsg = {
@@ -213,32 +517,40 @@ const ChatScreen = ({ route }) => {
   //     pending: true,
   //   };
 
+
   //   if (text) previewMsg.text = text;
   //   if (type === 'image') previewMsg.image = fileUri;
   //   if (type === 'video') previewMsg.video = fileUri;
   //   if (type === 'document')
   //     previewMsg.text = `📎 ${fileName || 'File attached'}`;
 
+
   //   setMessages(prev => GiftedChat.append(prev, [previewMsg]));
+
 
   //   try {
   //     let res;
   //     if (fileUri) {
   //       const formData = new FormData();
 
+
   //       formData.append('id', currentId.toString());
   //       formData.append('type', 'user');
   //       formData.append('temporaryMsgId', tempId);
+
 
   //       if (text) {
   //         formData.append('message', text);
   //       }
 
+
   //       let fileType = 'application/octet-stream';
   //       if (type === 'image') fileType = 'image/*';
   //       if (type === 'video') fileType = 'video/*';
 
+
   //       const finalName = fileName || `${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`;
+
 
   //       formData.append('file', {
   //         uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
@@ -246,9 +558,11 @@ const ChatScreen = ({ route }) => {
   //         name: finalName,
   //       });
 
+
   //       // 🚀 Header yahan mat do, interceptor handle karega
   //       res = await api.post('/sendMessage', formData);
   //     }
+
 
   //     else {
   //       // ✉️ Agar sirf text hai
@@ -261,7 +575,9 @@ const ChatScreen = ({ route }) => {
   //       });
   //     }
 
+
   //     console.log('✅ Sent to API:', res.data);
+
 
   //     // Update local message with server ID
   //     setMessages(prev =>
@@ -280,6 +596,7 @@ const ChatScreen = ({ route }) => {
   const sendMessageToApi = async ({ text, fileUri, fileName, type }) => {
     const tempId = uuid.v4();
 
+
     // 👀 Local preview message
     let previewMsg = {
       _id: tempId,
@@ -288,79 +605,136 @@ const ChatScreen = ({ route }) => {
       pending: true,
     };
 
+
     if (text) previewMsg.text = text;
     if (type === "image") previewMsg.image = fileUri;
     if (type === "video") previewMsg.video = fileUri;
-    if (type === "document")
-      previewMsg.text = `📎 ${fileName || "File attached"}`;
+    if (type === "document") previewMsg.text = `📎 ${fileName || "File attached"}`;
+
 
     setMessages((prev) => GiftedChat.append(prev, [previewMsg]));
 
+
     try {
-      let res;
+      let uploadUri = fileUri;
 
-      // ✅ Agar file hai
-      if (fileUri) {
-        let fileType = "application/octet-stream";
-        if (type === "image") fileType = "image/jpeg";
-        if (type === "video") fileType = "video/mp4";
 
-        const finalName =
-          fileName || `${Date.now()}.${type === "image" ? "jpg" : "mp4"}`;
-
-        res = await RNFetchBlob.fetch(
-          "POST",
-          "https://chat.threeonline.in/chatify/api/sendMessage",
-          {
-            Authorization: `Bearer ${getString("token")}`, // 👈 tumhara token storage se
-            "Content-Type": "multipart/form-data",
-            "X-Socket-Id": getString("socketId") || "",
-          },
-          [
-            { name: "id", data: currentId.toString() },
-            { name: "type", data: "user" },
-            { name: "temporaryMsgId", data: tempId },
-            text ? { name: "message", data: text } : null,
-            {
-              name: "file",
-              filename: finalName,
-              type: fileType,
-              data: RNFetchBlob.wrap(
-                Platform.OS === "ios"
-                  ? fileUri.replace("file://", "")
-                  : fileUri
-              ),
-            },
-          ].filter(Boolean) // null hata do
+      // ✅ Video compression
+      if (type === "video") {
+        console.log("📹 Compressing video...");
+        uploadUri = await VideoCompressor.compress(
+          fileUri,
+          { compressionMethod: "auto" },
+          (progress) => console.log("Compression progress:", progress)
         );
-
-        console.log("✅ Upload Response", res.json());
-      } else {
-        // ✉️ Agar sirf text hai
-        res = await api.post("/sendMessage", {
-          file: null,
-          id: currentId.toString(),
-          type: "user",
-          temporaryMsgId: tempId,
-          message: text || "",
-        });
-        console.log("✅ Text Sent:", res.data);
+        console.log("✅ Compressed Video Path:", uploadUri);
       }
 
-      const serverRes = res.json ? res.json() : res.data;
 
-      // 🟢 Update local message with server ID
+      // Prepare multipart/form-data
+      const finalName =
+        fileName ||
+        `${Date.now()}.${type === "image" ? "jpg" : type === "video" ? "mp4" : "bin"
+        }`;
+
+
+      let formData = [
+        { name: "id", data: currentId.toString() },
+        { name: "type", data: "user" },
+        { name: "temporaryMsgId", data: tempId },
+      ];
+
+
+      if (text) formData.push({ name: "message", data: text });
+
+
+      if (type) {
+        formData.push({
+          name: "file",
+          filename: finalName,
+          type:
+            type === "image"
+              ? "image/jpeg"
+              : type === "video"
+                ? "video/mp4"
+                : "application/octet-stream",
+          data: RNFetchBlob.wrap(
+            Platform.OS === "ios" ? uploadUri.replace("file://", "") : uploadUri
+          ),
+        });
+      }
+
+
+      const res = await RNFetchBlob.fetch(
+        "POST",
+        "https://chat.threeonline.in/chatify/api/sendMessage",
+        {
+          Authorization: `Bearer ${getString("token")}`,
+          "Content-Type": "multipart/form-data",
+          "X-Socket-Id": getString("socketId") || "",
+        },
+        formData
+      );
+
+
+      let serverRes;
+      try {
+        serverRes = res.json();
+      } catch {
+        serverRes = res.data;
+      }
+
+
+      // 🟢 Map server response to GiftedChat message
+      let newMsg = {
+        _id: serverRes.id?.toString() || tempId,
+        createdAt: new Date(serverRes.created_at || new Date()),
+        user: { _id: currentUserId.toString(), name: "You" },
+        pending: false,
+      };
+
+
+      // Text
+      if (text) newMsg.text = text;
+
+
+      // Attachment
+      if (serverRes.attachment) {
+        try {
+          const attachmentData = JSON.parse(serverRes.attachment);
+          const ext = attachmentData.old_name?.split(".").pop().toLowerCase();
+          const fileUrl = `https://chat.threeonline.in/storage/attachments/${attachmentData.new_name}`;
+
+
+          if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
+            newMsg.image = fileUrl;
+            if (!text) delete newMsg.text;
+          } else if (["mp4", "mov", "avi", "webm"].includes(ext)) {
+            newMsg.video = fileUrl;
+            if (!text) delete newMsg.text;
+          } else {
+            newMsg.text = `📎 ${attachmentData.old_name || "File attached"}`;
+            newMsg.file = fileUrl;
+          }
+        } catch (err) {
+          console.log("❌ Invalid attachment JSON:", serverRes.attachment);
+        }
+      }
+
+
+      // Update message in state
       setMessages((prev) =>
-        prev.map((m) =>
-          m._id === tempId
-            ? { ...m, _id: serverRes.id?.toString() || tempId, pending: false }
-            : m
-        )
+        prev.map((m) => (m._id === tempId ? newMsg : m))
       );
     } catch (err) {
       console.log("❌ Send error", err);
     }
   };
+
+
+
+
+
 
 
 
@@ -377,6 +751,7 @@ const ChatScreen = ({ route }) => {
     [currentId],
   );
 
+
   // 📄 Document picker
   const pickDocument = async () => {
     try {
@@ -385,6 +760,7 @@ const ChatScreen = ({ route }) => {
         files: [{ uri: res.uri, fileName: res.name ?? 'file' }],
         destination: 'documentDirectory',
       });
+
 
       sendMessageToApi({
         fileUri: local.uri || res.uri,
@@ -395,6 +771,7 @@ const ChatScreen = ({ route }) => {
       console.log('Picker canceled or error:', err);
     }
   };
+
 
   // 🖼️ Media picker (image / video)
   const pickMedia = async () => {
@@ -409,6 +786,7 @@ const ChatScreen = ({ route }) => {
     }
   };
 
+
   const renderCustomActions = () => (
     <View style={styles.actionContainer}>
       <TouchableOpacity onPress={pickDocument} style={styles.actionBtn}>
@@ -420,9 +798,12 @@ const ChatScreen = ({ route }) => {
     </View>
   );
 
+
   const imageMessages = messages
     .filter((m) => m.image)
     .map((m) => ({ uri: m.image }));
+
+
 
 
   // ✅ Custom Image renderer
@@ -431,6 +812,7 @@ const ChatScreen = ({ route }) => {
     const currentIndex = imageMessages.findIndex(
       (img) => img.uri === props.currentMessage.image
     );
+
 
     return (
       <TouchableOpacity
@@ -449,6 +831,112 @@ const ChatScreen = ({ route }) => {
   };
 
 
+  // 👇 Custom Video Render
+  const renderMessageVideo = (props) => {
+    const { currentMessage } = props;
+
+
+    if (!currentMessage.video) return null;
+
+
+    console.log("🎥 Rendering video:", currentMessage.video);
+
+
+    return (
+      <View style={{ borderRadius: 8, overflow: "hidden", margin: 4 }}>
+        <Video
+          source={{ uri: currentMessage.video }}
+          style={{ width: 250, height: 180 }}
+          resizeMode="cover"
+          controls
+          paused={true}
+        />
+      </View>
+    );
+  };
+  const renderBubble = (props, currentUserId) => {
+    const { currentMessage } = props;
+
+
+    const getFileType = (url) => {
+      if (!url) return '';
+      return url.split('.').pop().toLowerCase();
+    };
+
+
+    const fileType = getFileType(currentMessage?.file);
+
+
+    return (
+      <View>
+        {/* Image */}
+        {fileType === 'mp4' ? (
+          // 🎥 Video Message
+          <View
+            style={[
+              styles.videoContainer,
+              currentMessage.user._id === currentUserId.toString()
+                ? styles.rightAlign
+                : styles.leftAlign,
+            ]}
+          >
+            <Video
+              source={{ uri: currentMessage.file }}
+              style={styles.video}
+              resizeMode="contain"
+              controls
+            />
+          </View>
+        ) : fileType === 'mp3' || fileType === 'wav' || fileType === 'aac' || fileType === 'opus' ? (
+          // 🎵 Audio Message
+          <TouchableOpacity style={styles.fileBubble}>
+            <Text style={{ color: '#fff' }}>🎵 {currentMessage.text.replace("📎", "").trim()}</Text>
+          </TouchableOpacity>
+        ) : currentMessage?.file ? (
+          // 📎 Other File
+          <TouchableOpacity style={styles.fileBubble}>
+            <Text style={{ color: '#fff' }}>
+              📎 {currentMessage.text.replace("📎", "").trim()}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          // Normal Text
+          <Bubble
+            {...props}
+            wrapperStyle={{
+              right: { backgroundColor: '#1E90FF' },
+              left: { backgroundColor: '#f0f0f0' },
+            }}
+            textStyle={{
+              right: { color: '#fff' },
+              left: { color: '#000' },
+            }}
+          />
+        )}
+
+
+        {/* Pending Loader */}
+        {currentMessage?.pending && (
+          <ActivityIndicator
+            size="small"
+            color="#1E90FF"
+            style={{
+              marginTop: 4,
+              alignSelf:
+                currentMessage.user._id === currentUserId.toString()
+                  ? 'flex-end'
+                  : 'flex-start',
+            }}
+          />
+        )}
+      </View>
+    );
+  };
+
+
+
+
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -458,6 +946,7 @@ const ChatScreen = ({ route }) => {
           <Text style={{ fontSize: 18, fontWeight: '600' }}>Back</Text>
         </TouchableOpacity>
       </View>
+
 
       {/* Chat UI */}
       <GiftedChat
@@ -486,44 +975,44 @@ const ChatScreen = ({ route }) => {
         //   />
         // )}
 
-        renderBubble={props => {
-          const { currentMessage } = props;
-          return (
-            <View>
-              <Bubble
-                {...props}
-                wrapperStyle={{
-                  right: { backgroundColor: '#1E90FF' },
-                  left: { backgroundColor: '#f0f0f0' },
-                }}
-                textStyle={{
-                  right: { color: '#fff' },
-                  left: { color: '#000' },
-                }}
-              />
 
-              {/* 👇 Agar message pending hai to loader dikhayenge */}
-              {currentMessage?.pending && (
-                <ActivityIndicator
-                  size="small"
-                  color="#1E90FF"
-                  style={{
-                    marginTop: 4,
-                    alignSelf:
-                      currentMessage.user._id === currentUserId.toString()
-                        ? 'flex-end'
-                        : 'flex-start',
-                  }}
-                />
-              )}
-            </View>
-          );
-        }}
+        renderBubble={props => renderBubble(props, currentUserId)}
 
 
+        // renderBubble={props => {
+        //   const { currentMessage } = props;
+        //   return (
+        //     <View>
+        //       <Bubble
+        //         {...props}
+        //         wrapperStyle={{
+        //           right: { backgroundColor: '#1E90FF' },
+        //           left: { backgroundColor: '#f0f0f0' },
+        //         }}
+        //         textStyle={{
+        //           right: { color: '#fff' },
+        //           left: { color: '#000' },
+        //         }}
+        //       />
 
 
-
+        //       {/* 👇 Agar message pending hai to loader dikhayenge */}
+        //       {currentMessage?.pending && (
+        //         <ActivityIndicator
+        //           size="small"
+        //           color="#1E90FF"
+        //           style={{
+        //             marginTop: 4,
+        //             alignSelf:
+        //               currentMessage.user._id === currentUserId.toString()
+        //                 ? 'flex-end'
+        //                 : 'flex-start',
+        //           }}
+        //         />
+        //       )}
+        //     </View>
+        //   );
+        // }}
         renderInputToolbar={props => (
           <InputToolbar
             {...props}
@@ -560,6 +1049,7 @@ const ChatScreen = ({ route }) => {
         // inverted={true}
         loadEarlier={hasMore}       // 👈 dikhayega "Load Earlier"
         isLoadingEarlier={loading}  // 👈 spinner dikhayega
+        renderMessageVideo={renderMessageVideo}
         onLoadEarlier={() => getMessageHandle(page + 1)} // 👈 upar scroll pe aur messages fetch
         listViewProps={{
           refreshControl: (
@@ -567,6 +1057,7 @@ const ChatScreen = ({ route }) => {
           ),
         }}
       />
+
 
       <ImageView
         images={imageMessages}
@@ -578,7 +1069,9 @@ const ChatScreen = ({ route }) => {
   );
 };
 
+
 export default ChatScreen;
+
 
 const styles = StyleSheet.create({
   container: {
@@ -590,4 +1083,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 5,
   },
+  image: {
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+    margin: 4
+  }
 });
