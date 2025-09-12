@@ -14,6 +14,7 @@ import { screenHeight, screenWidth } from "../utils/Constant";
 import { useNavigation } from "@react-navigation/native";
 import { clearAll, getObject } from "../utils/mmkvStorage";
 import api from "../utils/api";
+import AudioRecorder from "../components/AudioRecording";
 
 const HomeScreen = () => {
     const { navigate } = useNavigation();
@@ -111,6 +112,8 @@ const HomeScreen = () => {
                     )}
                     contentContainerStyle={{ paddingVertical: screenHeight * 1 }}
                 />
+
+                {/* <AudioRecorder /> */}
             </SafeAreaView>
         </>
     );
